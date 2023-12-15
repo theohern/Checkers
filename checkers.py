@@ -19,11 +19,19 @@ class Checkers:
         self.score1 = 20
         self.score2 = 20
 
-
     def GetScore(self, verbose):
         if verbose : print(f"score {self.score1} - {self.score2}")
         return self.score1, self.score2
 
+    def CheckScore(self):
+        count1 = 0
+        count2 = 0
+        for i in range(10):
+            for j in range(10):
+                if self.board[i][j] > 0 : count1 += self.board[i][j]
+                elif self.board[i][j] < 0 : count2 -= self.board[i][j]
+        return count1 == self.score1 and count2 == self.score2
+    
     def reverse(self):
         tab = np.zeros((10,10))
         for i in range(10):
@@ -81,11 +89,11 @@ class Checkers:
         return (a <= 0 and b <=0) or (a >= 0 and b >= 0)
     
     def MoveQueen(self, x, y , pawn, OnlyEat=False, eatten=[], AllPath=[], path=[]):
-        path.append((x, y))
         SimpleMoves = []
-        if not OnlyEat : path = []
+        if not OnlyEat : path = []; AllPath = [];
         eat = False
         DRContinue, DLContinue, URContinue, ULContinue = True, True, True, True
+        path.append((x, y))
         for i in range(1,10):
             if self.IsOnBoard(x+i, y+i) and self.IsEmpty(x+i, y+i) and DRContinue  :
                 if not OnlyEat : SimpleMoves.append(((x, y), (x+i, y+i)))
@@ -125,6 +133,7 @@ class Checkers:
                     self.MoveQueen(x-i-1, y+i+1, pawn, OnlyEat=True, eatten=eatten2, AllPath=AllPath, path=path.copy())
 
         if not eat and len(path) > 1: AllPath.append(path)
+        
         return SimpleMoves, AllPath
  
     def MovePawn(self, x, y, pawn, OnlyEat=False, eatten=[], AllPath = [], path=[]):
@@ -160,7 +169,7 @@ class Checkers:
 
         if self.IsOnBoard(x+pawn, y-1) and self.IsEmpty(x+pawn, y-1):
             pass
-        elif self.IsOnBoard(x+pawn, y+1) and self.IsOnBoard(x+2*pawn, y-2) and self.IsEmpty(x+2*pawn, y-2) and not((x+pawn, y-1) in eatten):
+        elif self.IsOnBoard(x+pawn, y-1) and self.IsOnBoard(x+2*pawn, y-2) and self.IsEmpty(x+2*pawn, y-2) and not((x+pawn, y-1) in eatten):
             if not self.IsSameSign(pawn, self.board[x+pawn][y-1]) : 
                 eatten2 = eatten.copy()
                 eatten2.append((x+pawn, y-1))
@@ -190,23 +199,15 @@ class Checkers:
         return moves
 
     def FilterMovesPawn(self, moves):
-        Moves = []
         FinalMoves = []
-        for move in moves :
-            if len(move[1]) == 0:
-                for m in move[0]:
-                    Moves.append(m)
-            else :
-                for m in move[1]:
-                    Moves.append(m)
         maximum = 0
-        for m in Moves :
+        for m in moves :
             count = 0
             if isinstance(m, list) : count += 1
             count += len(m)
             if count > maximum:
                 maximum = count
-                FinalMoves = []
+                FinalMoves.clear()
                 FinalMoves.append(m)
             elif count == maximum:
                 FinalMoves.append(m)
@@ -263,11 +264,18 @@ class Checkers:
                 tab[i].append(self.board[i][j])
         return tab  
     
+    def MergeList(self, a, b):
+        liste = []
+        for i in a :
+            liste.append(i)
+        for i in b:
+            liste.append(i)
+        return liste
+    
     def PushMove(self, move):
         score = 0
         pawn  = self.board[move[0][0]][move[0][1]]
         xx = move[0][0] - move[1][0]
-        print(xx)
         if abs(xx) == 1 : 
             self.board[move[1][0]][move[1][1]] = pawn
             self.board[move[0][0]][move[0][1]] = 0
@@ -278,28 +286,37 @@ class Checkers:
                 deltax = m[0] - start[0]
                 deltay = m[1] - start[1]
                 if deltax > 0 and deltay > 0 : 
-                    score += self.board[m[0]-1][m[1]-1]
-                    self.board[m[0]-1][m[1]-1] = 0
+                    if self.board[m[0]-1][m[1]-1] != 0:
+                        score += self.board[m[0]-1][m[1]-1]
+                        self.board[m[0]-1][m[1]-1] = 0
                 elif deltax > 0 and deltay < 0 : 
-                    score += self.board[m[0]-1][m[1]+1]
-                    self.board[m[0]-1][m[1]+1] = 0
+                    if self.board[m[0]-1][m[1]+1] != 0 :
+                        score += self.board[m[0]-1][m[1]+1]
+                        self.board[m[0]-1][m[1]+1] = 0
                 elif deltax < 0 and deltay > 0 : 
-                    score += self.board[m[0]+1][m[1]-1]
-                    self.board[m[0]+1][m[1]-1] = 0
+                    if self.board[m[0]+1][m[1]-1] != 0:
+                        score += self.board[m[0]+1][m[1]-1]
+                        self.board[m[0]+1][m[1]-1] = 0
                 elif deltax < 0 and deltay < 0 : 
-                    score += self.board[m[0]+1][m[1]+1]
-                    self.board[m[0]+1][m[1]+1] = 0
+                    if self.board[m[0]+1][m[1]+1] != 0:
+                        score += self.board[m[0]+1][m[1]+1]
+                        self.board[m[0]+1][m[1]+1] = 0
+
                 start = m
             self.board[move[-1][0]][move[-1][1]] = pawn
             self.board[move[0][0]][move[0][1]] = 0
 
-            if pawn > 0 : 
-                self.score2 -= abs(score)
-                if move[-1][0] == 0: self.board[move[-1][0]][move[-1][1]] = 2
+        if pawn > 0 : 
+            self.score2 -= abs(score)
+            if move[-1][0] == 0: 
+                self.board[move[-1][0]][move[-1][1]] = 2
+                if pawn == 1 : self.score1 += 1
 
-            elif pawn < 0 :
-                self.score1 -= abs(score)
-                if move[-1][0] == 9: self.board[move[-1][0]][move[-1][1]] = -2
+        elif pawn < 0 :
+            self.score1 -= abs(score)
+            if move[-1][0] == 9: 
+                self.board[move[-1][0]][move[-1][1]] = -2
+                if pawn == -1 : self.score2 += 1
 
     def play(self, verbose=True):
         if verbose : self.Show()
@@ -307,7 +324,8 @@ class Checkers:
         while True :
             a = self.CopyBoard()
             player = -player
-            moves, moves2 = self.GetValidMoves(player, Filter=False)
+            moves, moves2 = self.GetValidMoves(player, Filter=True)
+            moves = self.MergeList(moves, moves2)
             if len(moves) == 0 : 
                 print(f"player {player} lose")
                 break
@@ -321,6 +339,7 @@ class Checkers:
                 print(move)
                 self.GetScore(verbose=True)
                 self.Show()
+                if not self.CheckScore() : raise ("probleme de score")
             end = self.EndGame()
             if (end == 2) : 
                 print("draw")
@@ -337,7 +356,13 @@ def main():
     game = Checkers()
     game.play(verbose=True)
 
+def main2():
+    game = Checkers(clear=True)
+    game.board[0][9] = 2
+    game.board[1][8] = -2
+    game.GetValidMoves(1, Filter=False, verbose=True)
+    game.Show()
+
 if "__main__" == __name__:
     main()
-    a = ([((5, 5), (4, 6)), ((5, 5), (4, 4))], [[(5, 5)]])
     
