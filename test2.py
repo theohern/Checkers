@@ -1,11 +1,12 @@
 import checkers
 import matplotlib.pyplot as plt
 from keras import Sequential, regularizers
-from keras.layers import Activation, Conv2D, Dropout, Dense, Flatten, BatchNormalization
-from keras.models import model_from_json
+from keras.layers import Dense
+from keras.models import save_model
 import tensorflow as tfw
 import numpy as np
 import random
+from tqdm import tqdm
 
 
 def CompareRandomMinmax(player1, player2, NumberPlays):
@@ -38,14 +39,10 @@ def CompareRandomMinmax(player1, player2, NumberPlays):
     plt.title('Répartition des jeux entre Black et White')
     plt.show()
 
-def main():
-    CompareRandomMinmax("minmax", "minmax", 1000)
-
 def concatenate(array1, array2):
     for i in range(len(array2)):
         array1.append(array2[i])
-    return array1
-    
+    return array1  
 
 def GetData(number):
     features = []
@@ -54,7 +51,7 @@ def GetData(number):
         _, features = game.playRandomMinMax(Bot1="minmax", Bot2="minmax", verbose=False, GetFeatures=True, ArrayFeatures=features)
     return features[:number]
 
-def GetModel():
+def GetModel(Oppenent, trained=False):
     metrics_model = Sequential()
     metrics_model.add(Dense(32, activation='relu', input_dim=5)) 
     metrics_model.add(Dense(16, activation='relu',  kernel_regularizer=regularizers.l2(0.1)))
@@ -63,49 +60,50 @@ def GetModel():
     metrics_model.add(Dense(1, activation='relu',  kernel_regularizer=regularizers.l2(0.1)))
     metrics_model.compile(optimizer='nadam', loss='binary_crossentropy', metrics=["acc"])
 
-    size = 10000
-    data = GetData(size)
-    metric = tfw.zeros((size, 5))
-    target = tfw.zeros(size)
-    count = 0
-    for d in data:
-        tensor = tfw.convert_to_tensor(d, dtype=tfw.float32)
-        metric = tfw.tensor_scatter_nd_update(metric, [[count]], [tensor[:5]])
-        target = tfw.tensor_scatter_nd_update(target, [[count]], [tensor[5]])
-        count += 1
+    if (trained):
+        size = 10000
+        data = GetData(size)
+        metric = tfw.zeros((size, 5))
+        target = tfw.zeros(size)
+        count = 0
+        for d in data:
+            tensor = tfw.convert_to_tensor(d, dtype=tfw.float32)
+            metric = tfw.tensor_scatter_nd_update(metric, [[count]], [tensor[:5]])
+            target = tfw.tensor_scatter_nd_update(target, [[count]], [tensor[5]])
+            count += 1
 
-    
-    history = metrics_model.fit(metric , target, epochs=32, batch_size=64, verbose=0)
+        
+        history = metrics_model.fit(metric , target, epochs=32, batch_size=64, verbose=0)
 
    
-    # History for accuracy
-    plt.plot(history.history['acc'])
-    plt.title('model accuracy')
-    plt.ylabel('accuracy')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'validation'], loc='upper left')
-    plt.show()
+        # History for accuracy
+        plt.plot(history.history['acc'])
+        plt.title('model accuracy')
+        plt.ylabel('accuracy')
+        plt.xlabel('epoch')
+        plt.legend(['train', 'validation'], loc='upper left')
+        plt.show()
 
-    # History for loss
-    plt.plot(history.history['loss'])
-    plt.title('model loss')
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'validation'], loc='upper left')
-    plt.show()
+        # History for loss
+        plt.plot(history.history['loss'])
+        plt.title('model loss')
+        plt.ylabel('loss')
+        plt.xlabel('epoch')
+        plt.legend(['train', 'validation'], loc='upper left')
+        plt.show()
 
     data = [] # tous les boards
     labels = np.zeros(1) # tous les QValues 
     winrates = []
     learning_rate = 0.5
     discount_factor = 0.95
+    exploration = 0.95
+    win = 0
+    lose = 0
+    draw = 0
 
-    for generations in range (200):
-        print(generations)
+    for generations in tqdm(range(500)):
         data = []
-        win = 0
-        lose = 0
-        draw = 0
         for g in range(10):
             temp_data = []
             game = checkers.Checkers()
@@ -114,7 +112,7 @@ def GetModel():
             while True:
                 count += 1
                 end2 = 0
-                if count > 200 :
+                if count > 1000 :
                     #print("draw")
                     draw += 1
                     break
@@ -135,12 +133,48 @@ def GetModel():
                         tab = leafs[i][2][:5]
                         temp_data.append(tab)
                     elif (player == -1):
-                        leafs = game.minmax(player) # move
-                        if (len(leafs) == 0):
-                            end2 = -player
+                        if Oppenent == "random":
+                            leafs = game.GetValidMoves(player) # move
+                            if (len(leafs) == 0):
+                                end2 = -player
+                                continue
+                            move = random.choice(leafs)
+                            game.PushMove(move)
+
+                        elif Oppenent == "minmax":
+                            moves = game.minmax(player)
+                            if len(moves) == 0 : 
+                                end2 == -player
+                                continue
+                            if random.random() >= exploration:
+                                Moves = game.GetValidMoves(player) # move
+                                move = random.choice(Moves)
+                                game.PushMove(move)
+                            else :
+                                move = random.choice(moves)
+                                game.PushMove(move)
+                        
+                        elif Oppenent == "itself":
+                            leafs = game.minmax(player, RL=True) # move | score | features
+                            Leaf = tfw.zeros((len(leafs), 5))
+                            for l in range(len(leafs)) :
+                                tensor = leafs[l][2]
+                                Leaf = tfw.tensor_scatter_nd_update(Leaf, [[l]], [tensor[:5]])
+                            scores = metrics_model.predict_on_batch(Leaf)
+                            if (len(scores) == 0):
+                                end2 = -player
+                                continue
+                            if (random.random() >= exploration):
+                                move = random.choice(leafs)
+                                move = move[0]
+                                game.PushMove(move)
+                            else:
+                                i = np.argmax(scores)
+                                game.PushMove(leafs[i][0])
+                        elif Oppenent == "trained":
                             continue
-                        move = random.choice(leafs)
-                        game.PushMove(move)
+                        else :
+                            raise("player do not exist")
 
                 #print(moves[i])
                 #game.Show ()
@@ -173,16 +207,12 @@ def GetModel():
                     break
 
                 player = -player 
-        print(len(data))
         data = tfw.constant(data)
-        print(data.shape)
-        print("fitting the model")
         metrics_model.fit(data[1:], labels[2:], epochs=16, batch_size=256, verbose=0)
-        print("done")
         labels = np.zeros(1)
-        winrate = int((win+draw)/(win+draw+lose)*100)
+        winrate = int((win)/(win+draw+lose)*100)
         winrates.append(winrate)
-        metrics_model.save_weights('model.h5')
+        metrics_model.save("minmax.keras")
 
     
 
@@ -193,9 +223,9 @@ def GetModel():
     plt.plot(indices, winrates, marker='o', linestyle='-')
 
     # Ajout de titres et de libellés d'axes
-    plt.title('Graphique des valeurs en fonction de l\'index')
-    plt.xlabel('Index dans le tableau')
-    plt.ylabel('Valeurs')
+    plt.title('Rates of win')
+    plt.xlabel('generations')
+    plt.ylabel('wins [%]')
 
     # Affichage du graphique
     plt.show()
@@ -204,5 +234,8 @@ def GetModel():
 
 
 
+
 if "__main__" == __name__ :
-    GetModel()
+    Oppenent = "minmax"
+    print(Oppenent)
+    GetModel(Oppenent=Oppenent)
