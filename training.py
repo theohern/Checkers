@@ -13,12 +13,12 @@ def concatenate(array1, array2):
     return array1  
 
 def GetModel(Oppenent):
-    metrics_model = Sequential()
-    metrics_model.add(Dense(32, activation='relu', input_dim=5)) 
-    metrics_model.add(Dense(16, activation='relu',  kernel_regularizer=regularizers.l2(0.1)))
+    model = Sequential()
+    model.add(Dense(32, activation='relu', input_dim=5)) 
+    model.add(Dense(16, activation='relu',  kernel_regularizer=regularizers.l2(0.1)))
 
-    metrics_model.add(Dense(1, activation='relu',  kernel_regularizer=regularizers.l2(0.1)))
-    metrics_model.compile(optimizer='nadam', loss='binary_crossentropy', metrics=["acc"])
+    model.add(Dense(1, activation='relu',  kernel_regularizer=regularizers.l2(0.1)))
+    model.compile(optimizer='nadam', loss='binary_crossentropy', metrics=["acc"])
 
     data = [] 
     labels = np.zeros(1)
@@ -51,7 +51,7 @@ def GetModel(Oppenent):
                         for l in range(len(leafs)) :
                             tensor = leafs[l][2]
                             Leaf = tfw.tensor_scatter_nd_update(Leaf, [[l]], [tensor[:5]])
-                        scores = metrics_model.predict_on_batch(Leaf)
+                        scores = model.predict_on_batch(Leaf)
                         if (len(scores) == 0):
                             end2 = -player
                             continue
@@ -87,7 +87,7 @@ def GetModel(Oppenent):
                             for l in range(len(leafs)) :
                                 tensor = leafs[l][2]
                                 Leaf = tfw.tensor_scatter_nd_update(Leaf, [[l]], [tensor[:5]])
-                            scores = metrics_model.predict_on_batch(Leaf)
+                            scores = model.predict_on_batch(Leaf)
                             if (len(scores) == 0):
                                 end2 = -player
                                 continue
@@ -109,7 +109,7 @@ def GetModel(Oppenent):
                     win += 1
                     reward = 10
                     temp_tensor = tfw.constant(temp_data[1:])
-                    old_prediction = metrics_model.predict_on_batch(temp_tensor)
+                    old_prediction = model.predict_on_batch(temp_tensor)
                     optimal_futur_value = np.ones(old_prediction.shape)
                     temp_labels = old_prediction + learning_rate * (reward + discount_factor * optimal_futur_value - old_prediction )
                     data = concatenate(data, temp_data[1:])
@@ -122,7 +122,7 @@ def GetModel(Oppenent):
                     lose = lose + 1
                     reward = -10
                     temp_tensor = tfw.constant(temp_data[1:])
-                    old_prediction = metrics_model.predict_on_batch(temp_tensor)
+                    old_prediction = model.predict_on_batch(temp_tensor)
                     optimal_futur_value = -1*np.ones(old_prediction.shape)
                     temp_labels = old_prediction + learning_rate * (reward + discount_factor * optimal_futur_value - old_prediction )
                     data = concatenate(data, temp_data[1:])
@@ -131,12 +131,11 @@ def GetModel(Oppenent):
 
                 player = -player 
         data = tfw.constant(data)
-        metrics_model.fit(data[1:], labels[2:], epochs=16, batch_size=256, verbose=0)
+        model.fit(data[1:], labels[2:], epochs=16, batch_size=256, verbose=0)
         labels = np.zeros(1)
         winrate = int((win)/(win+draw+lose)*100)
         winrates.append(winrate)
-        if generations % 100 == 99:
-            metrics_model.save("itself"+str(generations)+".keras")
+        model.save("models/"+Oppenent+"aa.keras")
 
     
 
