@@ -1,5 +1,7 @@
 # Checkers bots based on the Deep-Q learning algorithm
 
+The Medium article can be found [here](https://medium.com/@h_theo2001/deep-q-algorithm-for-checkers-4beb4d7de263) and a complete report [here](https://github.com/theohern/Checkers/blob/main/report.pdf) 
+
 This study were part of the course NIE-MVI : "Computational Intelligence Methods" in the Technical University of Prague. 
 
 Have you ever wondered how a computer can learn to play a board game by itself?
